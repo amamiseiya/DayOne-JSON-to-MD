@@ -1,18 +1,16 @@
 import io
 import json
 import os
-import glob
 import zipfile
 import fnmatch
 import shutil
-import sys
 from pytz import timezone
 from datetime import datetime
 
 
 # If you use Obsidian.md you don't have to specifically point to media file as long as they are somewhere in "embedded media" folder.
 # If true link will be ![[file]] else ![](/folder/file)
-relativeMediaLinking = False
+relativeMediaLinking = True
 
 
 # Cleans up text from "\special character"
@@ -137,15 +135,15 @@ def processJson(readFrom, subfolder, tempsubfolder, outpath):
                 newName = newName.replace(' ','%20')
                 text = text.replace(moment, f"![](/{folder}/{newName}.{momentFormat})")
             
-        rawtags = entry.get('tags')
+        rawTags = entry.get('tags')
         location = entry.get('location')
         
-        if rawtags:
+        filteredTags = []
+        if rawTags:
             # We only need to append tags that aren't set in text
-            filteredtags = []
-            for tag in rawtags:
+            for tag in rawTags:
                 if "#"+ tag not in text:
-                    filteredtags.append(tag.replace(" ", ""))
+                    filteredTags.append(tag.replace(" ", ""))
                 else:
                     print('This tag was ignored as it was in text: ',tag)
 
@@ -155,20 +153,28 @@ def processJson(readFrom, subfolder, tempsubfolder, outpath):
 
         yamlString = "---\n"+"title: "+title+"\n"
         yamlString += "date: " + datetime.strptime(entry['creationDate'], '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=timezone('UTC')).astimezone(myTimezone).strftime('%Y-%m-%d %H:%M:%S') + "\n"
-        if len(filteredtags)>0:
-            # add metadata for tags
-            yamlString+="tags:\n- "+ "\n- ".join(filteredtags) + "\n"
 
         if location:
             yamlString += "latitude: " + str(location['latitude']) + "\n"
             yamlString += "longitude: " + str(location['longitude']) + "\n"
 
+            if location.get('localityName'):
+                yamlString += "localityName: " + str(location['localityName']) + "\n"
+            if location.get('country'):
+                yamlString += "country: " + str(location['country']) + "\n"
         yamlString+="---\n\n"
 
         # newfilename = date +" — " + title + ".md"
         newfilename = date[:-9] + ".md"
         newfile = io.open(folderpath  +  "/" + newfilename , mode="a", encoding="utf-8")
         newfile.write(yamlString)
+
+        if len(filteredTags)>0:
+            # add metadata for tags
+            # yamlString+="tags:\n- "+ "\n- ".join(filteredTags) + "\n"
+            tagsString = "#" + " #".join(filteredTags) + "\n\n"
+            newfile.write(tagsString)
+
         newfile.write(text)
 
 
